@@ -42,6 +42,7 @@ import com.apitable.shared.config.properties.CookieProperties;
 import com.apitable.shared.context.SessionContext;
 import com.apitable.shared.util.information.ClientOriginInfo;
 import com.apitable.shared.util.information.InformationUtil;
+import com.apitable.user.service.IDeveloperService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.HashMap;
@@ -51,6 +52,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -59,6 +61,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Authorization interface.
  */
+@Slf4j
 @RestController
 @Tag(name = "Authorization related interface")
 @ApiResource(path = "/")
@@ -84,6 +87,9 @@ public class AuthController {
 
     @Resource
     private AuthServiceFacade authServiceFacade;
+
+    @Resource
+    private IDeveloperService iDeveloperService;
 
     @Value("${SKIP_REGISTER_VALIDATE:false}")
     private Boolean skipRegisterValidate;
@@ -130,10 +136,9 @@ public class AuthController {
             // Login processing
             Long userId = iAuthService.loginUsingPassword(loginRo);
             // event point - password login
-            eventBusFacade.onEvent(
-                new UserLoginEvent(userId, LoginType.PASSWORD, false,
-                    origin));
-                LoginResultVO.builder().apiToken("abc123a").build();
+            eventBusFacade.onEvent(new UserLoginEvent(userId, LoginType.PASSWORD, false, origin));
+            LoginResultVO.builder().apiToken("abc123a").build();
+
             return LoginResultVO.builder().userId(userId).build();
         });
         // SMS verification code login
@@ -186,6 +191,19 @@ public class AuthController {
         blackListServiceFacade.checkUser(userId);
         // save session
         SessionContext.setUserId(userId);
+
+        // Set access token
+        String apiKey = "";
+        boolean hasCreate = iDeveloperService.checkHasCreate(userId);
+        if (hasCreate) {
+            apiKey = iDeveloperService.refreshApiKey(userId);
+        } else {
+            apiKey = iDeveloperService.createApiKey(userId);
+        }
+
+        resultVO.setApiToken(apiKey);
+        log.info("New apiKey [{}]", apiKey);
+
         return ResponseData.success(resultVO);
     }
 
@@ -203,11 +221,23 @@ public class AuthController {
                                          final HttpServletResponse response) {
         LogoutVO logoutVO = new LogoutVO();
         Long userId = SessionContext.getUserIdWithoutException();
+
+        // Reset access token
+        if (userId != null) {
+            boolean hasCreate = iDeveloperService.checkHasCreate(userId);
+            if (hasCreate) {
+                iDeveloperService.refreshApiKey(userId);
+            } else {
+                iDeveloperService.createApiKey(userId);
+            }
+        }
+
         UserLogout userLogout = authServiceFacade.logout(new UserAuth(userId));
         if (userLogout != null) {
             logoutVO.setNeedRedirect(userLogout.isRedirect());
             logoutVO.setRedirectUri(userLogout.getRedirectUri());
         }
+
         SessionContext.cleanContext(request);
         SessionContext.removeCookie(response,
             cookieProperties.getI18nCookieName(),
