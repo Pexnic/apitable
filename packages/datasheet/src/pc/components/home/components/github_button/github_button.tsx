@@ -28,10 +28,10 @@ export const GithubButton = () => {
   }
   return (
     <div className={styles.githubBtnBox}>
-      <a className={styles.githubBtn} href="https://github.com/apitable/apitable" target="_blank" rel="noreferrer">
-        <GithubFilled color={colorVars.textCommonPrimary} size={24} />
+      <a className={styles.githubBtn} href="https://pexnic.com" target="_blank" rel="noreferrer">
+        {/* <GithubFilled color={colorVars.textCommonPrimary} size={24} /> */}
         <Typography variant="h7" color={colors.textCommonPrimary}>
-          Star us on Github
+          Pexnic Team
         </Typography>
       </a>
     </div>

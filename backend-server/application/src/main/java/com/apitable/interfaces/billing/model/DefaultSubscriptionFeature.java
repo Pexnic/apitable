@@ -58,37 +58,44 @@ import com.apitable.interfaces.billing.model.SubscriptionFeatures.SubscribeFeatu
 
 /**
  * Default subscription feature.
+ * Todo: veb DefaultSubscriptionFeature
  */
 public class DefaultSubscriptionFeature implements SubscriptionFeature {
 
     @Override
     public Seat getSeat() {
-        return new Seat(2L);
+        // return new Seat(2L);
+        return new Seat(-1L);
     }
 
     @Override
     public CapacitySize getCapacitySize() {
-        return new CapacitySize(1024 * 1024 * 1024L);
+        // return new CapacitySize(1024 * 1024 * 1024L);
+        return new CapacitySize(-1L);
     }
 
     @Override
     public SheetNums getSheetNums() {
-        return new SheetNums(5L);
+        // return new SheetNums(5L);
+        return new SheetNums(-1L);
     }
 
     @Override
     public RowsPerSheet getRowsPerSheet() {
-        return new RowsPerSheet(100L);
+        // return new RowsPerSheet(100L);
+        return new RowsPerSheet(-1L);
     }
 
     @Override
     public ArchivedRowsPerSheet getArchivedRowsPerSheet() {
-        return new ArchivedRowsPerSheet(250L);
+        // return new ArchivedRowsPerSheet(250L);
+        return new ArchivedRowsPerSheet(-1L);
     }
 
     @Override
     public RowNums getRowNums() {
-        return new RowNums(250L);
+        // return new RowNums(250L);
+        return new RowNums(-1L);
     }
 
     @Override

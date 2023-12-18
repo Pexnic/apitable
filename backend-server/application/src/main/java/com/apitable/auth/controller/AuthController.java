@@ -133,6 +133,7 @@ public class AuthController {
             eventBusFacade.onEvent(
                 new UserLoginEvent(userId, LoginType.PASSWORD, false,
                     origin));
+                LoginResultVO.builder().apiToken("abc123a").build();
             return LoginResultVO.builder().userId(userId).build();
         });
         // SMS verification code login

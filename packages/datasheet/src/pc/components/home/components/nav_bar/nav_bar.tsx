@@ -23,14 +23,14 @@ export const NavBar: React.FC<React.PropsWithChildren<{ gap?: number }>> = (prop
   const { gap = 32 } = props;
   const linkList = [
     {
-      href: 'https://help.apitable.com',
+      href: 'https://pexnic.com',
       target: '_blank',
-      text: 'Help Center',
+      text: 'Trung tâm hỗ trợ',
     },
     {
-      href: 'https://apitable.com',
+      href: 'https://pexnic.com',
       target: '_blank',
-      text: 'About',
+      text: 'Về chúng tôi',
     },
   ];
 

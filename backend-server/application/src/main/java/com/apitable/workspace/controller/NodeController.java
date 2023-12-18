@@ -42,6 +42,9 @@ import com.apitable.core.util.SqlTool;
 import com.apitable.organization.dto.MemberDTO;
 import com.apitable.organization.mapper.MemberMapper;
 import com.apitable.organization.service.IMemberService;
+import com.apitable.organization.service.IOrganizationService;
+import com.apitable.organization.service.IRoleMemberService;
+import com.apitable.organization.service.IRoleService;
 import com.apitable.organization.service.IUnitService;
 import com.apitable.organization.vo.CreatedMemberInfoVo;
 import com.apitable.organization.vo.MemberBriefInfoVo;
@@ -77,7 +80,11 @@ import com.apitable.workspace.mapper.NodeDescMapper;
 import com.apitable.workspace.mapper.NodeFavoriteMapper;
 import com.apitable.workspace.mapper.NodeShareSettingMapper;
 import com.apitable.workspace.ro.ActiveSheetsOpRo;
+import com.apitable.workspace.ro.AddNodeRoleRo;
+import com.apitable.workspace.ro.BatchDeleteNodeRoleRo;
+import com.apitable.workspace.ro.DeleteNodeRoleRo;
 import com.apitable.workspace.ro.ImportExcelOpRo;
+import com.apitable.workspace.ro.ModifyNodeRoleRo;
 import com.apitable.workspace.ro.NodeBundleOpRo;
 import com.apitable.workspace.ro.NodeCopyOpRo;
 import com.apitable.workspace.ro.NodeDescOpRo;
@@ -89,8 +96,10 @@ import com.apitable.workspace.ro.RemindUnitsNoPermissionRo;
 import com.apitable.workspace.service.IDatasheetService;
 import com.apitable.workspace.service.INodeDescService;
 import com.apitable.workspace.service.INodeRelService;
+import com.apitable.workspace.service.INodeRoleService;
 import com.apitable.workspace.service.INodeService;
 import com.apitable.workspace.service.NodeBundleService;
+import com.apitable.workspace.vo.NodeCollaboratorsVo;
 import com.apitable.workspace.vo.NodeInfo;
 import com.apitable.workspace.vo.NodeInfoTreeVo;
 import com.apitable.workspace.vo.NodeInfoVo;
@@ -111,6 +120,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -141,7 +151,19 @@ public class NodeController {
     private IMemberService memberService;
 
     @Resource
+    private IRoleService roleService;
+
+    @Resource
+    private IRoleMemberService roleMemberService;
+
+    @Resource
+    private IOrganizationService organizationService;
+
+    @Resource
     private INodeService iNodeService;
+
+    @Resource
+    private INodeRoleService iNodeRoleService;
 
     @Resource
     private INodeDescService iNodeDescService;
@@ -189,37 +211,33 @@ public class NodeController {
     private UserActiveSpaceCacheService userActiveSpaceCacheService;
 
     private static final String ROLE_DESC = "<br/>Role Type：<br/>"
-        + "1.owner can add, edit, move, sort, delete, copy folders in the specified working "
-        + "directory。<br/>"
-        + "2.manager can add, edit, move, sort, delete, and copy folders in the specified working "
-        + "directory.<br/>"
-        + "3.editor can only edit records and views of the data table, but not edit fields<br/>"
-        + "4.readonly can only view the number table, you cannot make any edits and modifications, "
-        + "you can only assign read-only permissions to other members。<br/>";
+            + "1.owner can add, edit, move, sort, delete, copy folders in the specified working "
+            + "directory。<br/>"
+            + "2.manager can add, edit, move, sort, delete, and copy folders in the specified working "
+            + "directory.<br/>"
+            + "3.editor can only edit records and views of the data table, but not edit fields<br/>"
+            + "4.readonly can only view the number table, you cannot make any edits and modifications, "
+            + "you can only assign read-only permissions to other members。<br/>";
 
     /**
      * Fuzzy search node.
      */
     @GetResource(path = "/search")
-    @Operation(summary = "Fuzzy search node", description =
-        "Enter the search term to search for the node of the working directory." + ROLE_DESC)
+    @Operation(summary = "Fuzzy search node", description = "Enter the search term to search for the node of the working directory."
+            + ROLE_DESC)
     @Parameters({
-        @Parameter(name = ParamsConstants.SPACE_ID, description = "space id", required = true,
-            schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "spcyQkKp9XJEl"),
-        @Parameter(name = "className", description = "highlight style",
-            schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "highLight"),
-        @Parameter(name = "keyword", description = "keyword", required = true,
-            schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "datasheet")
+        @Parameter(name = ParamsConstants.SPACE_ID, description = "space id", required = true, schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "spcyQkKp9XJEl"),
+        @Parameter(name = "className", description = "highlight style", schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "highLight"),
+        @Parameter(name = "keyword", description = "keyword", required = true, schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "datasheet")
     })
     public ResponseData<List<NodeSearchResult>> searchNode(
-        @RequestParam(name = "keyword") String keyword,
-        @RequestParam(value = "className", required = false, defaultValue = "keyword")
-        String className) {
+            @RequestParam(name = "keyword") String keyword,
+            @RequestParam(value = "className", required = false, defaultValue = "keyword") String className) {
         String spaceId = LoginContext.me().getSpaceId();
         Long memberId = LoginContext.me().getMemberId();
         List<NodeSearchResult> nodeInfos = iNodeService.searchNode(spaceId, memberId, keyword);
         nodeInfos.forEach(info -> info.setNodeName(
-            InformationUtil.keywordHighlight(info.getNodeName(), keyword, className)));
+                InformationUtil.keywordHighlight(info.getNodeName(), keyword, className)));
         return ResponseData.success(nodeInfos);
     }
 
@@ -227,17 +245,14 @@ public class NodeController {
      * Query tree node.
      */
     @GetResource(path = "/tree")
-    @Operation(summary = "Query tree node", description =
-        "Query the node tree of workbench, restricted to two levels." + ROLE_DESC)
+    @Operation(summary = "Query tree node", description = "Query the node tree of workbench, restricted to two levels."
+            + ROLE_DESC)
     @Parameters({
-        @Parameter(name = ParamsConstants.SPACE_ID, description = "space id", required = true,
-            schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "spcyQkKp9XJEl"),
-        @Parameter(name = "depth", in = ParameterIn.QUERY,
-            description = "tree depth, we can specify the query depth, maximum 2 layers depth.",
-            schema = @Schema(type = "integer"), example = "2")
+        @Parameter(name = ParamsConstants.SPACE_ID, description = "space id", required = true, schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "spcyQkKp9XJEl"),
+        @Parameter(name = "depth", in = ParameterIn.QUERY, description = "tree depth, we can specify the query depth, maximum 2 layers depth.", schema = @Schema(type = "integer"), example = "2")
     })
     public ResponseData<NodeInfoTreeVo> getTree(
-        @RequestParam(name = "depth", defaultValue = "2") @Valid @Min(0) @Max(2) Integer depth) {
+            @RequestParam(name = "depth", defaultValue = "2") @Valid @Min(0) @Max(2) Integer depth) {
         String spaceId = LoginContext.me().getSpaceId();
         Long memberId = LoginContext.me().getMemberId();
         String rootNodeId = iNodeService.getRootNodeIdBySpaceId(spaceId);
@@ -249,19 +264,14 @@ public class NodeController {
      * Get nodes of the specified type.
      */
     @GetResource(path = "/list")
-    @Operation(summary = "Get nodes of the specified type",
-        description = "scenario: query an existing dashboard")
+    @Operation(summary = "Get nodes of the specified type", description = "scenario: query an existing dashboard")
     @Parameters({
-        @Parameter(name = ParamsConstants.SPACE_ID, description = "space id", required = true,
-            in = ParameterIn.HEADER, schema = @Schema(type = "string"), example = "spczJrh2i3tLW"),
-        @Parameter(name = "type", description = "node type", required = true,
-            schema = @Schema(type = "integer"), in = ParameterIn.QUERY, example = "2"),
-        @Parameter(name = "role", description = "role（manageable by default）",
-            schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "manager")
+        @Parameter(name = ParamsConstants.SPACE_ID, description = "space id", required = true, in = ParameterIn.HEADER, schema = @Schema(type = "string"), example = "spczJrh2i3tLW"),
+        @Parameter(name = "type", description = "node type", required = true, schema = @Schema(type = "integer"), in = ParameterIn.QUERY, example = "2"),
+        @Parameter(name = "role", description = "role（manageable by default）", schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "manager")
     })
     public ResponseData<List<NodeInfo>> list(@RequestParam(value = "type") Integer type,
-                                             @RequestParam(value = "role", required = false, defaultValue = "manager")
-                                             String role) {
+            @RequestParam(value = "role", required = false, defaultValue = "manager") String role) {
         String spaceId = LoginContext.me().getSpaceId();
         Long memberId = LoginContext.me().getMemberId();
         List<String> nodeIds = iNodeService.getNodeIdBySpaceIdAndType(spaceId, type);
@@ -274,7 +284,7 @@ public class NodeController {
         }
         ControlRole requireRole = ControlRoleManager.parseNodeRole(role);
         List<String> filterNodeIds = roleDict.entrySet().stream()
-            .filter(entry -> entry.getValue().isGreaterThanOrEqualTo(requireRole))
+                .filter(entry -> entry.getValue().isGreaterThanOrEqualTo(requireRole))
             .map(Map.Entry::getKey).collect(Collectors.toList());
         if (CollUtil.isEmpty(filterNodeIds)) {
             return ResponseData.success(new ArrayList<>());
@@ -286,12 +296,10 @@ public class NodeController {
      * Query nodes.
      */
     @GetResource(path = "/get", requiredPermission = false)
-    @Operation(summary = "Query nodes",
-        description = "obtain information about the node " + ROLE_DESC)
-    @Parameter(name = "nodeIds", in = ParameterIn.QUERY, description = "node ids", required = true,
-        schema = @Schema(type = "string"), example = "nodRTGSy43DJ9,nodRTGSy43DJ9")
+    @Operation(summary = "Query nodes", description = "obtain information about the node " + ROLE_DESC)
+    @Parameter(name = "nodeIds", in = ParameterIn.QUERY, description = "node ids", required = true, schema = @Schema(type = "string"), example = "nodRTGSy43DJ9,nodRTGSy43DJ9")
     public ResponseData<List<NodeInfoVo>> getByNodeId(
-        @RequestParam("nodeIds") List<String> nodeIds) {
+            @RequestParam("nodeIds") List<String> nodeIds) {
         if (nodeIds.isEmpty()) {
             return ResponseData.success(ListUtil.empty());
         }
@@ -307,17 +315,15 @@ public class NodeController {
      */
     @GetResource(path = "/showcase", requiredLogin = false)
     @Operation(summary = "Folder preview", description = "Nodes that are not in the center of the"
-        + " template, make cross-space judgments.")
+            + " template, make cross-space judgments.")
     @Parameters({
-        @Parameter(name = "nodeId", description = "node id", required = true,
-            schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "nodRTGSy43DJ9"),
-        @Parameter(name = "shareId", description = "share id", schema = @Schema(type = "string"),
-            in = ParameterIn.QUERY, example = "shrRTGSy43DJ9")
+        @Parameter(name = "nodeId", description = "node id", required = true, schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "nodRTGSy43DJ9"),
+        @Parameter(name = "shareId", description = "share id", schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "shrRTGSy43DJ9")
     })
     public ResponseData<ShowcaseVo> showcase(@RequestParam("nodeId") String nodeId,
-                                             @RequestParam(value = "shareId", required = false)
-                                             String shareId) {
-        // Obtain the node entity. The method includes determining whether the node exists.
+            @RequestParam(value = "shareId", required = false) String shareId) {
+        // Obtain the node entity. The method includes determining whether the node
+        // exists.
         NodeEntity node = iNodeService.getByNodeId(nodeId);
         ControlRole role;
         boolean nodeFavorite = false;
@@ -330,7 +336,7 @@ public class NodeController {
                 if (!nodeId.equals(shareNodeId)) {
                     List<String> nodes = iNodeService.getPathParentNode(nodeId);
                     ExceptionUtil.isTrue(nodes.contains(shareNodeId),
-                        PermissionException.NODE_ACCESS_DENIED);
+                            PermissionException.NODE_ACCESS_DENIED);
                 }
                 role = ControlRoleManager.parseNodeRole(Node.ANONYMOUS);
             } else {
@@ -338,9 +344,8 @@ public class NodeController {
                 Long memberId = LoginContext.me().getUserSpaceDto(node.getSpaceId()).getMemberId();
                 role = controlTemplate.fetchNodeRole(memberId, nodeId);
                 // query whether the node is favorite
-                nodeFavorite =
-                    SqlTool.retCount(nodeFavoriteMapper.countByMemberIdAndNodeId(memberId, nodeId))
-                        > 0;
+                nodeFavorite = SqlTool.retCount(
+                        nodeFavoriteMapper.countByMemberIdAndNodeId(memberId, nodeId)) > 0;
             }
         } else {
             role = ControlRoleManager.parseNodeRole(Node.TEMPLATE_VISITOR);
@@ -348,8 +353,8 @@ public class NodeController {
         String description = nodeDescMapper.selectDescriptionByNodeId(nodeId);
         NodePermissionView permissions = role.permissionToBean(NodePermissionView.class);
         // query node creator basic information
-        MemberDTO memberDto =
-            memberMapper.selectMemberDtoByUserIdAndSpaceId(node.getCreatedBy(), node.getSpaceId());
+        MemberDTO memberDto = memberMapper.selectMemberDtoByUserIdAndSpaceId(node.getCreatedBy(),
+                node.getSpaceId());
         CreatedMemberInfoVo createdMemberInfo = null;
         if (null != memberDto) {
             createdMemberInfo = new CreatedMemberInfoVo();
@@ -360,13 +365,13 @@ public class NodeController {
         ShowcaseVo.Social social = null;
         if (StrUtil.isNotBlank(extra.getDingTalkCorpId())) {
             social = new Social(extra.getDingTalkDaStatus(), extra.getDingTalkSuiteKey(),
-                extra.getDingTalkCorpId(), extra.getSourceTemplateId(), extra.getShowTips());
+                    extra.getDingTalkCorpId(), extra.getSourceTemplateId(), extra.getShowTips());
         }
         ShowcaseVo vo = new ShowcaseVo(nodeId, node.getNodeName(), node.getType(), node.getIcon(),
-            node.getCover(),
-            description, role.getRoleTag(), permissions, nodeFavorite, createdMemberInfo,
-            node.getUpdatedAt(),
-            social, extra);
+                node.getCover(),
+                description, role.getRoleTag(), permissions, nodeFavorite, createdMemberInfo,
+                node.getUpdatedAt(),
+                social, extra);
         return ResponseData.success(vo);
     }
 
@@ -375,9 +380,9 @@ public class NodeController {
      */
     @GetResource(path = "/window", requiredPermission = false)
     @Operation(summary = "Node info window", description = "Nodes that are not in the center of "
-        + "the template, make spatial judgments.")
+            + "the template, make spatial judgments.")
     public ResponseData<NodeInfoWindowVo> showNodeInfoWindow(
-        @RequestParam("nodeId") String nodeId) {
+            @RequestParam("nodeId") String nodeId) {
         // The method includes determining whether the user is in this space.
         Long userId = SessionContext.getUserId();
         // The method includes determining whether a node exists.
@@ -385,7 +390,7 @@ public class NodeController {
         // check permission
         Long memberId = LoginContext.me().getMemberId(userId, spaceId);
         controlTemplate.checkNodePermission(memberId, nodeId, NodePermission.READ_NODE,
-            status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
+                status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
         // build node info window
         return ResponseData.success(iNodeService.getNodeWindowInfo(nodeId));
     }
@@ -394,12 +399,11 @@ public class NodeController {
      * Get parent nodes.
      */
     @GetResource(path = "/parents", requiredPermission = false)
-    @Operation(summary = "Get parent nodes", description =
-        "Gets a list of all parent nodes of the specified node " + ROLE_DESC)
-    @Parameter(name = "nodeId", description = "node id", required = true,
-        schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "nodRTGSy43DJ9")
+    @Operation(summary = "Get parent nodes", description = "Gets a list of all parent nodes of the specified node "
+            + ROLE_DESC)
+    @Parameter(name = "nodeId", description = "node id", required = true, schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "nodRTGSy43DJ9")
     public ResponseData<List<NodePathVo>> getParentNodes(
-        @RequestParam(name = "nodeId") String nodeId) {
+            @RequestParam(name = "nodeId") String nodeId) {
         // The method includes determining whether a node exists.
         String spaceId = iNodeService.getSpaceIdByNodeId(nodeId);
         // check whether cross space
@@ -412,18 +416,15 @@ public class NodeController {
      * Get child nodes.
      */
     @GetResource(path = "/children", requiredPermission = false)
-    @Operation(summary = "Get child nodes",
-        description = "Obtain the list of child nodes of the specified node."
+    @Operation(summary = "Get child nodes", description = "Obtain the list of child nodes of the specified node."
             + " The nodes are classified into folders or datasheet by type " + ROLE_DESC)
     @Parameters({
-        @Parameter(name = "nodeId", description = "node id", required = true,
-            schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "nodRTGSy43DJ9"),
-        @Parameter(name = "nodeType", description = "node type 1:folder,2:datasheet",
-            schema = @Schema(type = "integer"), in = ParameterIn.QUERY, example = "1")
+        @Parameter(name = "nodeId", description = "node id", required = true, schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "nodRTGSy43DJ9"),
+        @Parameter(name = "nodeType", description = "node type 1:folder,2:datasheet", schema = @Schema(type = "integer"), in = ParameterIn.QUERY, example = "1")
     })
     public ResponseData<List<NodeInfoVo>> getNodeChildrenList(
-        @RequestParam(name = "nodeId") String nodeId,
-        @RequestParam(name = "nodeType", required = false) Integer nodeType) {
+            @RequestParam(name = "nodeId") String nodeId,
+            @RequestParam(name = "nodeType", required = false) Integer nodeType) {
         // get the space ID, the method includes judging whether the node exists
         String spaceId = iNodeService.getSpaceIdByNodeId(nodeId);
         NodeType nodeTypeEnum = null;
@@ -432,8 +433,8 @@ public class NodeController {
         }
         // The method includes determining whether the user is in this space.
         Long memberId = LoginContext.me().getUserSpaceDto(spaceId).getMemberId();
-        List<NodeInfoVo> nodeInfos =
-            iNodeService.getChildNodesByNodeId(spaceId, memberId, nodeId, nodeTypeEnum);
+        List<NodeInfoVo> nodeInfos = iNodeService.getChildNodesByNodeId(spaceId, memberId, nodeId,
+                nodeTypeEnum);
         return ResponseData.success(nodeInfos);
     }
 
@@ -442,8 +443,7 @@ public class NodeController {
      */
     @GetResource(path = "/position/{nodeId}", requiredPermission = false)
     @Operation(summary = "Position node", description = "node in must " + ROLE_DESC)
-    @Parameter(name = "nodeId", description = "node id", required = true,
-        schema = @Schema(type = "string"), in = ParameterIn.PATH, example = "nodRTGSy43DJ9")
+    @Parameter(name = "nodeId", description = "node id", required = true, schema = @Schema(type = "string"), in = ParameterIn.PATH, example = "nodRTGSy43DJ9")
     public ResponseData<NodeInfoTreeVo> position(@PathVariable("nodeId") String nodeId) {
         // The method includes determining whether a node exists.
         String spaceId = iNodeService.getSpaceIdByNodeId(nodeId);
@@ -451,7 +451,7 @@ public class NodeController {
         Long memberId = LoginContext.me().getUserSpaceDto(spaceId).getMemberId();
         // check node permissions
         controlTemplate.checkNodePermission(memberId, nodeId, NodePermission.READ_NODE,
-            status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
+                status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
         NodeInfoTreeVo treeVo = iNodeService.position(spaceId, memberId, nodeId);
         return ResponseData.success(treeVo);
     }
@@ -461,10 +461,8 @@ public class NodeController {
      */
     @Notification(templateId = NotificationTemplateId.NODE_CREATE)
     @PostResource(path = "/create", requiredPermission = false)
-    @Operation(summary = "Create child node",
-        description = "create a new node under the node" + ROLE_DESC)
-    @Parameter(name = ParamsConstants.PLAYER_SOCKET_ID, description = "user socket id",
-        schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "QkKp9XJEl")
+    @Operation(summary = "Create child node", description = "create a new node under the node" + ROLE_DESC)
+    @Parameter(name = ParamsConstants.PLAYER_SOCKET_ID, description = "user socket id", schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "QkKp9XJEl")
     public ResponseData<NodeInfoVo> create(@RequestBody @Valid NodeOpRo nodeOpRo) {
         Long userId = SessionContext.getUserId();
         // The method includes determining whether a node exists.
@@ -474,30 +472,31 @@ public class NodeController {
         Long memberId = LoginContext.me().getMemberId(userId, spaceId);
         // Check whether the parent node has the specified operation permission
         iNodeService.checkEnableOperateNodeBySpaceFeature(memberId, spaceId,
-            nodeOpRo.getParentId());
+                nodeOpRo.getParentId());
         ControlRole role = controlTemplate.fetchNodeRole(memberId, nodeOpRo.getParentId());
         ExceptionUtil.isTrue(role.hasPermission(NodePermission.CREATE_NODE),
-            PermissionException.NODE_OPERATION_DENIED);
-        // Check whether the source tables of form and mirror exist and whether they have the
+                PermissionException.NODE_OPERATION_DENIED);
+        // Check whether the source tables of form and mirror exist and whether they
+        // have the
         // specified operation permissions.
         iNodeService.checkSourceDatasheet(spaceId, memberId, nodeOpRo.getType(),
-            nodeOpRo.getExtra());
+                nodeOpRo.getExtra());
         if (Boolean.TRUE.equals(nodeOpRo.getCheckDuplicateName())
-            && StrUtil.isNotBlank(nodeOpRo.getNodeName())) {
+                && StrUtil.isNotBlank(nodeOpRo.getNodeName())) {
             Optional<NodeEntity> nodeOptional = iNodeService.findSameNameInSameLevel(
-                nodeOpRo.getParentId(), nodeOpRo.getNodeName());
+                    nodeOpRo.getParentId(), nodeOpRo.getNodeName());
             if (nodeOptional.isPresent()) {
                 return ResponseData.status(false, DUPLICATE_NODE_NAME.getCode(),
                         DUPLICATE_NODE_NAME.getMessage())
-                    .data(iNodeService.getNodeInfoByNodeId(spaceId, nodeOptional.get().getNodeId(), role));
+                        .data(iNodeService.getNodeInfoByNodeId(spaceId,
+                                nodeOptional.get().getNodeId(), role));
             }
         }
         String nodeId = iNodeService.createNode(userId, spaceId, nodeOpRo);
         // publish space audit events
         ClientOriginInfo clientOriginInfo = InformationUtil
-            .getClientOriginInfoInCurrentHttpContext(true, false);
-        AuditSpaceArg arg =
-            AuditSpaceArg.builder().action(AuditSpaceAction.CREATE_NODE).userId(userId)
+                .getClientOriginInfoInCurrentHttpContext(true, false);
+        AuditSpaceArg arg = AuditSpaceArg.builder().action(AuditSpaceAction.CREATE_NODE).userId(userId)
                 .nodeId(nodeId)
                 .requestIp(clientOriginInfo.getIp())
                 .requestUserAgent(clientOriginInfo.getUserAgent())
@@ -512,20 +511,18 @@ public class NodeController {
      */
     @Notification(templateId = NotificationTemplateId.NODE_UPDATE)
     @PostResource(path = "/update/{nodeId}", requiredPermission = false)
-    @Operation(summary = "Edit node",
-        description = "node id must. name, icon is not required" + ROLE_DESC)
+    @Operation(summary = "Edit node", description = "node id must. name, icon is not required" + ROLE_DESC)
     @Parameters({
-        @Parameter(name = "nodeId", description = "node id", required = true,
-            schema = @Schema(type = "string"), in = ParameterIn.PATH, example = "nodRTGSy43DJ9"),
-        @Parameter(name = ParamsConstants.PLAYER_SOCKET_ID, description = "user socket id",
-            schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "QkKp9XJEl")
+        @Parameter(name = "nodeId", description = "node id", required = true, schema = @Schema(type = "string"), in = ParameterIn.PATH, example = "nodRTGSy43DJ9"),
+        @Parameter(name = ParamsConstants.PLAYER_SOCKET_ID, description = "user socket id", schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "QkKp9XJEl")
     })
     public ResponseData<NodeInfoVo> update(@PathVariable("nodeId") String nodeId,
-                                           @RequestBody @Valid NodeUpdateOpRo nodeOpRo) {
+            @RequestBody @Valid NodeUpdateOpRo nodeOpRo) {
         ExceptionUtil.isTrue(
-            StrUtil.isNotBlank(nodeOpRo.getNodeName()) || ObjectUtil.isNotNull(nodeOpRo.getIcon())
-                || ObjectUtil.isNotNull(nodeOpRo.getCover()) || ObjectUtil.isNotNull(
-                nodeOpRo.getShowRecordHistory()), ParameterException.NO_ARG);
+                StrUtil.isNotBlank(nodeOpRo.getNodeName()) || ObjectUtil.isNotNull(nodeOpRo.getIcon())
+                        || ObjectUtil.isNotNull(nodeOpRo.getCover()) || ObjectUtil.isNotNull(
+                                nodeOpRo.getShowRecordHistory()),
+                ParameterException.NO_ARG);
         Long userId = SessionContext.getUserId();
         // The method includes determining whether a node exists.
         String spaceId = iNodeService.getSpaceIdByNodeId(nodeId);
@@ -534,11 +531,11 @@ public class NodeController {
         Long memberId = LoginContext.me().getMemberId(userId, spaceId);
         // check whether the node has the specified operation permission
         controlTemplate.checkNodePermission(memberId, nodeId, NodePermission.MANAGE_NODE,
-            status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
+                status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
         iNodeService.edit(userId, nodeId, nodeOpRo);
         return ResponseData.success(
-            iNodeService.getNodeInfoByNodeIds(spaceId, memberId, ListUtil.toList(nodeId)).stream()
-                .findFirst().orElse(null));
+                iNodeService.getNodeInfoByNodeIds(spaceId, memberId, ListUtil.toList(nodeId)).stream()
+                        .findFirst().orElse(null));
     }
 
     /**
@@ -547,8 +544,7 @@ public class NodeController {
     @Notification(templateId = NotificationTemplateId.NODE_UPDATE_DESC)
     @PostResource(path = "/updateDesc", requiredPermission = false)
     @Operation(summary = "Update node description")
-    @Parameter(name = ParamsConstants.PLAYER_SOCKET_ID, description = "user socket id",
-        schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "QkKp9XJEl")
+    @Parameter(name = ParamsConstants.PLAYER_SOCKET_ID, description = "user socket id", schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "QkKp9XJEl")
     public ResponseData<Void> updateDesc(@RequestBody @Valid NodeDescOpRo opRo) {
         // The method includes determining whether a node exists.
         String spaceId = iNodeService.getSpaceIdByNodeId(opRo.getNodeId());
@@ -557,16 +553,16 @@ public class NodeController {
         Long memberId = LoginContext.me().getUserSpaceDto(spaceId).getMemberId();
         // Check whether there is a specified operation permission under the node.
         controlTemplate.checkNodePermission(memberId, opRo.getNodeId(),
-            NodePermission.EDIT_NODE_DESC,
-            status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
+                NodePermission.EDIT_NODE_DESC,
+                status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
         iNodeDescService.edit(opRo.getNodeId(), opRo.getDescription());
         // publish space audit events
         ClientOriginInfo clientOriginInfo = InformationUtil
-            .getClientOriginInfoInCurrentHttpContext(true, false);
+                .getClientOriginInfoInCurrentHttpContext(true, false);
         AuditSpaceArg arg = AuditSpaceArg.builder().action(AuditSpaceAction.UPDATE_NODE_DESC)
-            .requestIp(clientOriginInfo.getIp())
-            .requestUserAgent(clientOriginInfo.getUserAgent())
-            .userId(SessionContext.getUserId()).nodeId(opRo.getNodeId()).build();
+                .requestIp(clientOriginInfo.getIp())
+                .requestUserAgent(clientOriginInfo.getUserAgent())
+                .userId(SessionContext.getUserId()).nodeId(opRo.getNodeId()).build();
         SpringContextHolder.getApplicationContext().publishEvent(new AuditSpaceEvent(this, arg));
         return ResponseData.success();
     }
@@ -576,20 +572,17 @@ public class NodeController {
      */
     @Notification(templateId = NotificationTemplateId.NODE_MOVE)
     @PostResource(path = "/move")
-    @Operation(summary = "Move node",
-        description = "Node ID and parent node ID are required, and pre Node Id is not required.")
+    @Operation(summary = "Move node", description = "Node ID and parent node ID are required, and pre Node Id is not required.")
     @Parameters({
-        @Parameter(name = ParamsConstants.SPACE_ID, description = "space id", required = true,
-            schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "spcyQkKp9XJEl"),
-        @Parameter(name = ParamsConstants.PLAYER_SOCKET_ID, description = "user socket id",
-            schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "QkKp9XJEl")
+        @Parameter(name = ParamsConstants.SPACE_ID, description = "space id", required = true, schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "spcyQkKp9XJEl"),
+        @Parameter(name = ParamsConstants.PLAYER_SOCKET_ID, description = "user socket id", schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "QkKp9XJEl")
     })
     public ResponseData<List<NodeInfoVo>> move(@RequestBody @Valid NodeMoveOpRo nodeOpRo) {
         Long memberId = LoginContext.me().getMemberId();
         String spaceId = LoginContext.me().getSpaceId();
         SpaceHolder.set(spaceId);
         iNodeService.checkEnableOperateNodeBySpaceFeature(memberId, spaceId,
-            nodeOpRo.getParentId());
+                nodeOpRo.getParentId());
         iNodeService.checkNodeIfExist(spaceId, nodeOpRo.getNodeId());
         iNodeService.checkNodeIfExist(spaceId, nodeOpRo.getParentId());
         if (StrUtil.isNotBlank(nodeOpRo.getPreNodeId())) {
@@ -597,21 +590,23 @@ public class NodeController {
         }
         // manageable for this node
         controlTemplate.checkNodePermission(memberId, nodeOpRo.getNodeId(),
-            NodePermission.MOVE_NODE,
-            status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
+                NodePermission.MOVE_NODE,
+                status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
         // check movement operation
         String parentId = iNodeService.getParentIdByNodeId(nodeOpRo.getNodeId());
         iNodeService.checkEnableOperateNodeBySpaceFeature(memberId, spaceId, parentId);
         if (parentId.equals(nodeOpRo.getParentId())) {
             // move under sibling
             controlTemplate.checkNodePermission(memberId, nodeOpRo.getParentId(),
-                NodePermission.MANAGE_NODE,
-                status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
+                    NodePermission.MANAGE_NODE,
+                    status -> ExceptionUtil.isTrue(status,
+                            PermissionException.NODE_OPERATION_DENIED));
         } else {
             // manageable destination folder
             controlTemplate.checkNodePermission(memberId, nodeOpRo.getParentId(),
-                NodePermission.CREATE_NODE,
-                status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
+                    NodePermission.CREATE_NODE,
+                    status -> ExceptionUtil.isTrue(status,
+                            PermissionException.NODE_OPERATION_DENIED));
         }
         Long userId = SessionContext.getUserId();
         List<String> nodeIds = iNodeService.move(userId, nodeOpRo);
@@ -622,15 +617,12 @@ public class NodeController {
      * Delete node.
      */
     @Notification(templateId = NotificationTemplateId.NODE_DELETE)
-    @PostResource(path = "/delete/{nodeId}",
-        method = {RequestMethod.DELETE, RequestMethod.POST}, requiredPermission = false)
-    @Operation(summary = "Delete node",
-        description = "You can pass in an ID array and delete multiple nodes.")
+    @PostResource(path = "/delete/{nodeId}", method = { RequestMethod.DELETE,
+        RequestMethod.POST }, requiredPermission = false)
+    @Operation(summary = "Delete node", description = "You can pass in an ID array and delete multiple nodes.")
     @Parameters({
-        @Parameter(name = "nodeId", description = "node id", required = true,
-            schema = @Schema(type = "string"), in = ParameterIn.PATH, example = "nodRTGSy43DJ9"),
-        @Parameter(name = ParamsConstants.PLAYER_SOCKET_ID, description = "user socket id",
-            schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "QkKp9XJEl")
+        @Parameter(name = "nodeId", description = "node id", required = true, schema = @Schema(type = "string"), in = ParameterIn.PATH, example = "nodRTGSy43DJ9"),
+        @Parameter(name = ParamsConstants.PLAYER_SOCKET_ID, description = "user socket id", schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "QkKp9XJEl")
     })
     public ResponseData<Void> delete(@PathVariable("nodeId") String nodeId) {
         // The method includes determining whether a node exists.
@@ -643,7 +635,7 @@ public class NodeController {
         ExceptionUtil.isFalse(nodeId.equals(rootNodeId), PermissionException.NODE_OPERATION_DENIED);
         // Check whether there is a specified operation permission under the node.
         controlTemplate.checkNodePermission(memberId, nodeId, NodePermission.REMOVE_NODE,
-            status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
+                status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
         iNodeService.deleteById(spaceId, memberId, nodeId);
         // delete space capacity cache
         spaceCapacityCacheService.del(spaceId);
@@ -655,10 +647,8 @@ public class NodeController {
      */
     @Notification(templateId = NotificationTemplateId.NODE_CREATE)
     @PostResource(path = "/copy", requiredPermission = false)
-    @Operation(summary = "Copy node",
-        description = "node id is required, whether to copy data is not required.")
-    @Parameter(name = ParamsConstants.PLAYER_SOCKET_ID, description = "user socket id",
-        schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "QkKp9XJEl")
+    @Operation(summary = "Copy node", description = "node id is required, whether to copy data is not required.")
+    @Parameter(name = ParamsConstants.PLAYER_SOCKET_ID, description = "user socket id", schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "QkKp9XJEl")
     public ResponseData<NodeInfoVo> copy(@RequestBody @Valid NodeCopyOpRo nodeOpRo) {
         Long userId = SessionContext.getUserId();
         // The method includes determining whether a node exists.
@@ -668,30 +658,31 @@ public class NodeController {
         Long memberId = LoginContext.me().getMemberId(userId, spaceId);
         // Verify the permissions of this node
         controlTemplate.checkNodePermission(memberId, nodeOpRo.getNodeId(),
-            NodePermission.COPY_NODE,
-            status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
-        // Copy the datasheet requires the parent node's permission to create child nodes.
+                NodePermission.COPY_NODE,
+                status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
+        // Copy the datasheet requires the parent node's permission to create child
+        // nodes.
         String parentId = iNodeService.getParentIdByNodeId(nodeOpRo.getNodeId());
         ControlRole role = controlTemplate.fetchNodeRole(memberId, parentId);
         ExceptionUtil.isTrue(role.hasPermission(NodePermission.CREATE_NODE),
-            PermissionException.NODE_OPERATION_DENIED);
+                PermissionException.NODE_OPERATION_DENIED);
         // replication node
         NodeCopyEffectDTO copyEffect = iNodeService.copy(userId, nodeOpRo);
         iNodeService.nodeCopyChangeset(copyEffect);
         // publish space audit events
         ClientOriginInfo clientOriginInfo = InformationUtil
-            .getClientOriginInfoInCurrentHttpContext(true, false);
-        AuditSpaceArg arg =
-            AuditSpaceArg.builder().action(AuditSpaceAction.COPY_NODE).userId(userId)
+                .getClientOriginInfoInCurrentHttpContext(true, false);
+        AuditSpaceArg arg = AuditSpaceArg.builder().action(AuditSpaceAction.COPY_NODE).userId(userId)
                 .nodeId(copyEffect.getCopyNodeId())
                 .requestIp(clientOriginInfo.getIp())
                 .requestUserAgent(clientOriginInfo.getUserAgent())
                 .info(JSONUtil.createObj().set(AuditConstants.SOURCE_NODE_ID, nodeOpRo.getNodeId())
-                    .set(AuditConstants.RECORD_COPYABLE, nodeOpRo.getData())).build();
+                        .set(AuditConstants.RECORD_COPYABLE, nodeOpRo.getData()))
+                .build();
         SpringContextHolder.getApplicationContext().publishEvent(new AuditSpaceEvent(this, arg));
         // The new node inherits parent node permissions by default
         return ResponseData.success(
-            iNodeService.getNodeInfoByNodeId(spaceId, copyEffect.getCopyNodeId(), role));
+                iNodeService.getNodeInfoByNodeId(spaceId, copyEffect.getCopyNodeId(), role));
     }
 
     /**
@@ -700,17 +691,13 @@ public class NodeController {
     @GetResource(path = "/exportBundle", requiredPermission = false)
     @Operation(summary = "Export Bundle")
     @Parameters({
-        @Parameter(name = "nodeId", description = "node id", required = true,
-            schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "fod8mXUeiXyVo"),
-        @Parameter(name = "saveData", description = "whether to retain data",
-            schema = @Schema(type = "boolean"), in = ParameterIn.QUERY, example = "true"),
-        @Parameter(name = "password", description = "encrypted password",
-            schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "qwer1234")
+        @Parameter(name = "nodeId", description = "node id", required = true, schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "fod8mXUeiXyVo"),
+        @Parameter(name = "saveData", description = "whether to retain data", schema = @Schema(type = "boolean"), in = ParameterIn.QUERY, example = "true"),
+        @Parameter(name = "password", description = "encrypted password", schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "qwer1234")
     })
     public void exportBundle(@RequestParam("nodeId") String nodeId,
-                             @RequestParam(value = "saveData", required = false, defaultValue = "true")
-                             Boolean saveData,
-                             @RequestParam(value = "password", required = false) String password) {
+            @RequestParam(value = "saveData", required = false, defaultValue = "true") Boolean saveData,
+            @RequestParam(value = "password", required = false) String password) {
         Long userId = SessionContext.getUserId();
         // The method includes determining whether a node exists.
         String spaceId = iNodeService.getSpaceIdByNodeId(nodeId);
@@ -719,10 +706,10 @@ public class NodeController {
         Long memberId = LoginContext.me().getMemberId(userId, spaceId);
         // check node permissions
         controlTemplate.checkNodePermission(memberId, nodeId, NodePermission.MANAGE_NODE,
-            status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
+                status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
         // Verify the permissions of all child and descendant nodes
         iNodeService.checkSubNodePermission(memberId, nodeId,
-            ControlRoleManager.parseNodeRole(Node.MANAGER));
+                ControlRoleManager.parseNodeRole(Node.MANAGER));
         nodeBundleService.generate(nodeId, saveData, password);
     }
 
@@ -731,8 +718,8 @@ public class NodeController {
      */
     @PostResource(path = "/analyzeBundle", requiredLogin = false)
     @Operation(summary = "Analyze Bundle", description = "The front node is saved in the first "
-        + "place of the parent node when it is not under the parent node. Save in the first place"
-        + " of the first level directory when it is not transmitted.")
+            + "place of the parent node when it is not under the parent node. Save in the first place"
+            + " of the first level directory when it is not transmitted.")
     public ResponseData<Void> analyzeBundle(@Valid NodeBundleOpRo opRo) {
         String parentId = opRo.getParentId();
         Long userId = SessionContext.getUserId();
@@ -744,13 +731,14 @@ public class NodeController {
         // verify parent node permissions
         if (StrUtil.isNotBlank(parentId)) {
             controlTemplate.checkNodePermission(memberId, parentId, NodePermission.CREATE_NODE,
-                status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
+                    status -> ExceptionUtil.isTrue(status,
+                            PermissionException.NODE_OPERATION_DENIED));
         }
         if (StrUtil.isBlank(parentId) && StrUtil.isBlank(opRo.getPreNodeId())) {
             parentId = iNodeService.getRootNodeIdBySpaceId(spaceId);
         }
         nodeBundleService.analyze(opRo.getFile(), opRo.getPassword(), parentId, opRo.getPreNodeId(),
-            userId);
+                userId);
         return ResponseData.success();
     }
 
@@ -758,11 +746,11 @@ public class NodeController {
      * Import excel.
      */
     @Notification(templateId = NotificationTemplateId.NODE_CREATE)
-    @PostResource(path = {"/import", "/{parentId}/importExcel"}, requiredPermission = false)
+    @PostResource(path = { "/import", "/{parentId}/importExcel" }, requiredPermission = false)
     @Operation(summary = "Import excel", description = "all parameters must be")
     public ResponseData<NodeInfoVo> importExcel(@Valid ImportExcelOpRo data) throws IOException {
         ExceptionUtil.isTrue(data.getFile().getSize() <= limitProperties.getMaxFileSize(),
-            ActionException.FILE_EXCEED_LIMIT);
+                ActionException.FILE_EXCEED_LIMIT);
         Long userId = SessionContext.getUserId();
         // The method includes determining whether a node exists.
         String spaceId = iNodeService.getSpaceIdByNodeId(data.getParentId());
@@ -772,7 +760,7 @@ public class NodeController {
         // Check whether there is a specified operation permission under the node.
         ControlRole role = controlTemplate.fetchNodeRole(memberId, data.getParentId());
         ExceptionUtil.isTrue(role.hasPermission(NodePermission.CREATE_NODE),
-            PermissionException.NODE_OPERATION_DENIED);
+                PermissionException.NODE_OPERATION_DENIED);
         // String nodeId = iNodeService.importExcel(userId, spaceId, data);
         // The new node inherits parent node permissions by default
         String uuid = userMapper.selectUuidById(userId);
@@ -781,12 +769,10 @@ public class NodeController {
         if (StrUtil.isBlank(mainName)) {
             throw new BusinessException("file name is empty");
         }
-        mainName =
-            iNodeService.duplicateNameModify(data.getParentId(), NodeType.DATASHEET.getNodeType(),
+        mainName = iNodeService.duplicateNameModify(data.getParentId(), NodeType.DATASHEET.getNodeType(),
                 mainName, null);
         // file type suffix
-        String fileSuffix =
-            cn.hutool.core.io.FileUtil.extName(data.getFile().getOriginalFilename());
+        String fileSuffix = cn.hutool.core.io.FileUtil.extName(data.getFile().getOriginalFilename());
         if (StrUtil.isBlank(fileSuffix)) {
             throw new BusinessException("file name suffix must not be empty");
         }
@@ -795,25 +781,21 @@ public class NodeController {
             // identification file code
             String encoding = FileTool.identifyCoding(data.getFile().getInputStream());
             // Regenerate the byte stream according to the identification file encoding
-            InputStream targetInputStream =
-                new ByteArrayInputStream(
+            InputStream targetInputStream = new ByteArrayInputStream(
                     IOUtils.toString(data.getFile().getInputStream(), encoding).getBytes());
-            createNodeId =
-                iNodeService.parseCsv(userId, uuid, spaceId, memberId, data.getParentId(),
+            createNodeId = iNodeService.parseCsv(userId, uuid, spaceId, memberId, data.getParentId(),
                     data.getViewName(), mainName, targetInputStream);
         } else if (fileSuffix.equals(FileSuffixConstants.XLS)
-            || fileSuffix.equals(FileSuffixConstants.XLSX)) {
-            createNodeId =
-                iNodeService.parseExcel(userId, uuid, spaceId, memberId, data.getParentId(),
+                || fileSuffix.equals(FileSuffixConstants.XLSX)) {
+            createNodeId = iNodeService.parseExcel(userId, uuid, spaceId, memberId, data.getParentId(),
                     data.getViewName(), mainName, fileSuffix, data.getFile().getInputStream());
         } else {
             throw new BusinessException(ActionException.FILE_ERROR_FORMAT);
         }
         // publish space audit events
         ClientOriginInfo clientOriginInfo = InformationUtil
-            .getClientOriginInfoInCurrentHttpContext(true, false);
-        AuditSpaceArg arg =
-            AuditSpaceArg.builder().action(AuditSpaceAction.IMPORT_NODE).userId(userId)
+                .getClientOriginInfoInCurrentHttpContext(true, false);
+        AuditSpaceArg arg = AuditSpaceArg.builder().action(AuditSpaceAction.IMPORT_NODE).userId(userId)
                 .requestIp(clientOriginInfo.getIp())
                 .requestUserAgent(clientOriginInfo.getUserAgent())
                 .nodeId(createNodeId).build();
@@ -825,10 +807,8 @@ public class NodeController {
      * Record active node.
      */
     @PostResource(path = "/active", requiredPermission = false)
-    @Operation(summary = "Record active node",
-        description = "node id and view id are not required（do not pass means all closed）")
-    @Parameter(name = ParamsConstants.SPACE_ID, description = "space id", required = true,
-        schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "spcBrtP3ulTXR")
+    @Operation(summary = "Record active node", description = "node id and view id are not required（do not pass means all closed）")
+    @Parameter(name = ParamsConstants.SPACE_ID, description = "space id", required = true, schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "spcBrtP3ulTXR")
     public ResponseData<Void> activeSheets(@RequestBody @Valid ActiveSheetsOpRo opRo) {
         Long userId = SessionContext.getUserId();
         String spaceId;
@@ -838,8 +818,8 @@ public class NodeController {
         } else {
             // The method includes determining whether a node exists.
             spaceId = iNodeService.getSpaceIdByNodeId(opRo.getNodeId());
-            OpenedSheet openedSheet =
-                OpenedSheet.builder().nodeId(opRo.getNodeId()).viewId(opRo.getViewId())
+            OpenedSheet openedSheet = OpenedSheet.builder().nodeId(opRo.getNodeId())
+                    .viewId(opRo.getViewId())
                     .position(opRo.getPosition()).build();
             userSpaceOpenedSheetCacheService.refresh(userId, spaceId, openedSheet);
         }
@@ -878,16 +858,16 @@ public class NodeController {
     @PostResource(path = "/remind/units/noPermission", requiredPermission = false)
     @Operation(summary = "Gets no permission member before remind")
     public ResponseData<List<MemberBriefInfoVo>> postRemindUnitsNoPermission(
-        @RequestBody @Validated RemindUnitsNoPermissionRo request) {
+            @RequestBody @Validated RemindUnitsNoPermissionRo request) {
 
         // Get a list of all members under the organizational unit
         List<Long> allMemberIds = unitService.getMembersIdByUnitIds(request.getUnitIds());
         String nodeId = request.getNodeId();
         // list of member ids without permissions
         List<Long> noPermissionMemberIds = allMemberIds.stream()
-            .filter(memberId -> !controlTemplate.hasNodePermission(memberId, nodeId,
-                NodePermission.READ_NODE))
-            .collect(Collectors.toList());
+                .filter(memberId -> !controlTemplate.hasNodePermission(memberId, nodeId,
+                        NodePermission.READ_NODE))
+                .collect(Collectors.toList());
 
         return ResponseData.success(memberService.getMemberBriefInfo(noPermissionMemberIds));
 
@@ -897,48 +877,34 @@ public class NodeController {
      * Check for associated nodes.
      */
     @GetResource(path = "/checkRelNode", requiredPermission = false)
-    @Operation(summary = "check for associated nodes",
-        description = "permission of the associated node is not required."
+    @Operation(summary = "check for associated nodes", description = "permission of the associated node is not required."
             + " Scenario: Check whether the view associated mirror before deleting the table.")
     @Parameters({
-        @Parameter(name = "nodeId", description = "node id", required = true,
-            schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "dstU8Agt2"),
-        @Parameter(name = "viewId", description = "view id（do not specify full return）",
-            schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "viwF1CqEW2GxY"),
-        @Parameter(name = "type", in = ParameterIn.QUERY,
-            description = "node type（do not specify full return，form:3/mirror:5）",
-            schema = @Schema(type = "integer"), example = "5")
+        @Parameter(name = "nodeId", description = "node id", required = true, schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "dstU8Agt2"),
+        @Parameter(name = "viewId", description = "view id（do not specify full return）", schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "viwF1CqEW2GxY"),
+        @Parameter(name = "type", in = ParameterIn.QUERY, description = "node type（do not specify full return，form:3/mirror:5）", schema = @Schema(type = "integer"), example = "5")
     })
     public ResponseData<List<NodeInfo>> checkRelNode(@RequestParam("nodeId") String nodeId,
-                                                     @RequestParam(value = "viewId", required = false)
-                                                     String viewId,
-                                                     @RequestParam(value = "type", required = false)
-                                                     Integer type) {
+            @RequestParam(value = "viewId", required = false) String viewId,
+            @RequestParam(value = "type", required = false) Integer type) {
         return ResponseData.success(
-            iNodeRelService.getRelationNodeInfoByNodeId(nodeId, viewId, null, type));
+                iNodeRelService.getRelationNodeInfoByNodeId(nodeId, viewId, null, type));
     }
 
     /**
      * Get associated node.
      */
     @GetResource(path = "/getRelNode", requiredPermission = false)
-    @Operation(summary = "Get associated node",
-        description = "This interface requires readable or above permissions of the associated"
+    @Operation(summary = "Get associated node", description = "This interface requires readable or above permissions of the associated"
             + " node. Scenario: Open the display columns of form and mirror in the datasheet.")
     @Parameters({
-        @Parameter(name = "nodeId", description = "node id", required = true,
-            schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "dstU8Agt2Jv"),
-        @Parameter(name = "viewId", description = "view id（do not specify full return）",
-            schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "viwF1CqEW2GxY"),
-        @Parameter(name = "type", in = ParameterIn.QUERY,
-            description = "node type（do not specify full return，form:3/mirror:5）",
-            schema = @Schema(type = "integer"), example = "5")
+        @Parameter(name = "nodeId", description = "node id", required = true, schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "dstU8Agt2Jv"),
+        @Parameter(name = "viewId", description = "view id（do not specify full return）", schema = @Schema(type = "string"), in = ParameterIn.QUERY, example = "viwF1CqEW2GxY"),
+        @Parameter(name = "type", in = ParameterIn.QUERY, description = "node type（do not specify full return，form:3/mirror:5）", schema = @Schema(type = "integer"), example = "5")
     })
     public ResponseData<List<NodeInfo>> getNodeRel(@RequestParam("nodeId") String nodeId,
-                                                   @RequestParam(value = "viewId", required = false)
-                                                   String viewId,
-                                                   @RequestParam(value = "type", required = false)
-                                                   Integer type) {
+            @RequestParam(value = "viewId", required = false) String viewId,
+            @RequestParam(value = "type", required = false) Integer type) {
         Long userId = SessionContext.getUserId();
         // The method includes determining whether a node exists.
         String spaceId = iNodeService.getSpaceIdByNodeId(nodeId);
@@ -946,24 +912,118 @@ public class NodeController {
         Long memberId = LoginContext.me().getMemberId(userId, spaceId);
         // check node permissions
         controlTemplate.checkNodePermission(memberId, nodeId, NodePermission.READ_NODE,
-            status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
+                status -> ExceptionUtil.isTrue(status, PermissionException.NODE_OPERATION_DENIED));
         return ResponseData.success(
-            iNodeRelService.getRelationNodeInfoByNodeId(nodeId, viewId, memberId, type));
+                iNodeRelService.getRelationNodeInfoByNodeId(nodeId, viewId, memberId, type));
     }
 
     /**
      * Member recent open node list.
      */
     @GetResource(path = "/recentList", requiredPermission = false)
-    @Operation(summary = "member recent open node list",
-        description = "member recent open node list")
-    @Parameter(name = ParamsConstants.SPACE_ID, description = "space id", required = true,
-        schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "spcyQkKp9XJEl")
+    @Operation(summary = "member recent open node list", description = "member recent open node list")
+    @Parameter(name = ParamsConstants.SPACE_ID, description = "space id", required = true, schema = @Schema(type = "string"), in = ParameterIn.HEADER, example = "spcyQkKp9XJEl")
     public ResponseData<List<NodeSearchResult>> recentList() {
         String spaceId = LoginContext.me().getSpaceId();
         Long memberId = LoginContext.me().getMemberId();
         List<NodeSearchResult> nodeInfos = iNodeService.recentList(spaceId, memberId);
         return ResponseData.success(nodeInfos);
+    }
+
+    /**
+     * List role.
+     */
+    @GetResource(path = "/listRole", requiredPermission = false)
+    @Operation(summary = "get role list", description = "get role list")
+    @Parameter(name = ParamsConstants.NODE_ID_PARAMETER, description = "node id", required = true)
+    public ResponseData<NodeCollaboratorsVo> listRole(@RequestParam("nodeId") String nodeId) {
+        String spaceId = LoginContext.me().getSpaceId();
+        NodeCollaboratorsVo nodeInfos = iNodeRoleService.getListRole(spaceId, nodeId);
+        return ResponseData.success(nodeInfos);
+    }
+
+    /**
+     * Add role.
+     */
+    @PostResource(path = "/addRole", requiredPermission = false)
+    @Operation(summary = "add role", description = "add role")
+    @Parameter(name = ParamsConstants.NODE_ID_PARAMETER, description = "node id", required = true)
+    public ResponseData<Void> addRole(@RequestBody @Valid AddNodeRoleRo addNodeRoleRo) {
+        Long userId = LoginContext.me().getLoginUser().getUserId();
+
+        List<Long> unitIds = addNodeRoleRo.getUnitIds();
+
+        iNodeRoleService.addNodeRole(userId, addNodeRoleRo.getNodeId(), addNodeRoleRo.getRole(), unitIds);
+        return ResponseData.success();
+    }
+
+    /**
+     * Delete role.
+     */
+    @PostResource(path = "/deleteRole", method = RequestMethod.DELETE, requiredPermission = false)
+    @Operation(summary = "delete role", description = "delete role")
+    @Parameter(name = ParamsConstants.NODE_ID_PARAMETER, description = "node id", required = true)
+    public ResponseData<Void> deleteRole(@RequestBody @Valid DeleteNodeRoleRo deleteNodeRoleRo) {
+        Long userId = LoginContext.me().getLoginUser().getUserId();
+        iNodeRoleService.deleteNodeRole(userId, deleteNodeRoleRo.getNodeId(),
+                deleteNodeRoleRo.getUnitId());
+        return ResponseData.success();
+    }
+
+    /**
+     * Batch delete role.
+     */
+    @PostResource(path = "/batchDeleteRole", method = RequestMethod.DELETE, requiredPermission = false)
+    @Operation(summary = "batch delete role", description = "batch delete role")
+    @Parameter(name = ParamsConstants.NODE_ID_PARAMETER, description = "node id", required = true)
+    public ResponseData<Void> batchDeleteRole(
+            @RequestBody @Valid BatchDeleteNodeRoleRo batchDeleteNodeRoleRo) {
+        iNodeRoleService.deleteNodeRoles(batchDeleteNodeRoleRo.getNodeId(),
+                batchDeleteNodeRoleRo.getUnitIds());
+        return ResponseData.success();
+    }
+
+    /**
+     * Edit role.
+     */
+    @PostResource(path = "/editRole", requiredPermission = false)
+    @Operation(summary = "edit role", description = "edit role")
+    @Parameter(name = ParamsConstants.NODE_ID_PARAMETER, description = "node id", required = true)
+    public ResponseData<Void> editRole(@RequestBody @Valid ModifyNodeRoleRo modifyNodeRoleRo) {
+        Long userId = LoginContext.me().getLoginUser().getUserId();
+        List<Long> unitIds = new ArrayList<Long>(Arrays.asList(modifyNodeRoleRo.getUnitId()));
+
+        iNodeRoleService.updateNodeRole(userId, modifyNodeRoleRo.getNodeId(),
+                modifyNodeRoleRo.getRole(), unitIds);
+        return ResponseData.success();
+    }
+
+    /**
+     * Batch edit role.
+     */
+    @PostResource(path = "/batchEditRole", requiredPermission = false)
+    @Operation(summary = "batch edit role", description = "batch edit role")
+    @Parameter(name = ParamsConstants.NODE_ID_PARAMETER, description = "node id", required = true)
+    public ResponseData<Void> batchEditRole(@RequestBody @Valid AddNodeRoleRo batchEditNodeRoleRo) {
+        Long userId = LoginContext.me().getLoginUser().getUserId();
+        iNodeRoleService.addNodeRole(userId, batchEditNodeRoleRo.getNodeId(),
+                batchEditNodeRoleRo.getRole(),
+                batchEditNodeRoleRo.getUnitIds());
+        return ResponseData.success();
+    }
+
+    /**
+     * Enable role extend.
+     */
+    @PostResource(path = "/enableRoleExtend", requiredPermission = false)
+    @Operation(summary = "enable role extend", description = "enable role extend")
+    @Parameter(name = ParamsConstants.NODE_ID_PARAMETER, description = "node id", required = true)
+    public ResponseData<Void> enableRoleExtend(
+            @RequestParam("nodeId") String nodeId) {
+        String spaceId = LoginContext.me().getSpaceId();
+        Long userId = LoginContext.me().getLoginUser().getUserId();
+        iNodeRoleService.enableNodeRole(userId, spaceId, nodeId, true);
+        return ResponseData.success();
     }
 
 }

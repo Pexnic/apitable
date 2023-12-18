@@ -24,9 +24,8 @@ import { PublishControllers } from 'pc/components/notification/publish';
 import { Router } from 'pc/components/route_manager/router';
 import { useAppDispatch } from 'pc/hooks/use_app_dispatch';
 // @ts-ignore
-import { triggerUsageAlert } from 'enterprise/billing/trigger_usage_alert';
-
-import {useAppSelector} from "pc/store/react-redux";
+import { useAppSelector } from 'pc/store/react-redux';
+// import { triggerUsageAlert } from 'enterprise/billing/trigger_usage_alert';
 
 export const useNotificationRequest = () => {
   const dispatch = useDispatch();
@@ -149,7 +148,8 @@ export const useNotificationCreate = ({ spaceId }: { fromUserId: string; spaceId
       if (success) {
         dispatch(StoreActions.getSubAdminList(1));
         Message.success({ content: t(Strings.add_sub_admin_success) });
-        triggerUsageAlert('maxAdminNums', { usage: spaceInfo!.adminNums + memberIds.length });
+        // Todo: VEB
+        // triggerUsageAlert('maxAdminNums', { usage: spaceInfo!.adminNums + memberIds.length });
       } else {
         Message.error({ content: message });
       }

@@ -22,6 +22,7 @@ import com.apitable.organization.vo.UnitMemberVo;
 import com.apitable.shared.util.page.PageInfo;
 import com.apitable.workspace.dto.ControlRoleInfo;
 import com.apitable.workspace.dto.SimpleNodeInfo;
+import com.apitable.workspace.vo.NodeCollaboratorsVo;
 import com.apitable.workspace.vo.NodeRoleMemberVo;
 import com.apitable.workspace.vo.NodeRoleUnit;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -236,4 +237,13 @@ public interface INodeRoleService {
      * @return the required roles
      */
     List<String> getMinimumRequiredRole(List<Integer> nodePermissions);
+
+    /**
+     * Get role list.
+     *
+     * @param spaceId  space id
+     * @param nodeId   node id
+     * @return Role list
+     */
+    NodeCollaboratorsVo getListRole(String spaceId, String nodeId);
 }

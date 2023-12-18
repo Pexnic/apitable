@@ -28,18 +28,18 @@ export const HomeWrapper: React.FC<React.PropsWithChildren<unknown>> = ({ childr
   const colors = useThemeColors();
 
   const linkIcons = [
-    {
-      icon: <TwitterOutlined color={colors.textCommonPrimary} size={32} />,
-      link: 'https://twitter.com/apitable_com',
-    },
-    {
-      icon: <LinkedinOutlined color={colors.textCommonPrimary} size={32} />,
-      link: 'https://www.linkedin.com/company/APITable',
-    },
-    {
-      icon: <EmailfeedbackOutlined color={colors.textCommonPrimary} size={32} />,
-      link: 'mailto:support@apitable.com',
-    },
+    // {
+    //   icon: <TwitterOutlined color={colors.textCommonPrimary} size={32} />,
+    //   link: 'https://twitter.com/apitable_com',
+    // },
+    // {
+    //   icon: <LinkedinOutlined color={colors.textCommonPrimary} size={32} />,
+    //   link: 'https://www.linkedin.com/company/APITable',
+    // },
+    // {
+    //   icon: <EmailfeedbackOutlined color={colors.textCommonPrimary} size={32} />,
+    //   link: 'mailto:support@apitable.com',
+    // },
   ];
 
   let socialIconsContent;
@@ -89,7 +89,7 @@ export const HomeWrapper: React.FC<React.PropsWithChildren<unknown>> = ({ childr
           <Typography variant={'h7'} color={colors.textCommonSecondary}>
             {getEnvVariables().IS_AITABLE
               ? 'Custom ChatGPT with Table in 1-Click'
-              : getEnvVariables().LOGIN_MOTTO || "let's make the world more productive!"}
+              : getEnvVariables().LOGIN_MOTTO || 'unleash the power of technology!'}
           </Typography>
         </div>
         {socialIconsContent}

@@ -74,6 +74,7 @@ import com.apitable.workspace.mapper.NodeMapper;
 import com.apitable.workspace.service.IControlMemberService;
 import com.apitable.workspace.service.INodeRoleService;
 import com.apitable.workspace.service.INodeService;
+import com.apitable.workspace.vo.NodeCollaboratorsVo;
 import com.apitable.workspace.vo.NodeRoleMemberVo;
 import com.apitable.workspace.vo.NodeRoleUnit;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -89,6 +90,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import javax.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -173,7 +175,7 @@ public class NodeRoleServiceImpl implements INodeRoleService {
     @Transactional(rollbackFor = Exception.class)
     public void addNodeRole(Long userId, String nodeId, String role, List<Long> unitIds) {
         log.info("[{}] add the permission role of organization unit [{}] to node [{}] as [{}]",
-            userId, nodeId, unitIds, role);
+            userId, unitIds, nodeId, role);
         // cannot specify modification to node owner
         ExceptionUtil.isFalse(role.equals(Node.OWNER), PermissionException.ADD_NODE_ROLE_ERROR);
         // Filter organizational units, modify those that already exist, and add those that do not exist.
@@ -210,7 +212,7 @@ public class NodeRoleServiceImpl implements INodeRoleService {
     @Override
     public void updateNodeRole(Long userId, String nodeId, String role, List<Long> unitIds) {
         log.info("[{}] Modify the permission role of organizational unit [{}] at node [{}] to [{}]",
-            userId, nodeId, unitIds, role);
+            userId, unitIds, nodeId, role);
         // cannot specify modification to node owner
         ExceptionUtil.isFalse(role.equals(Node.OWNER), PermissionException.UPDATE_NODE_ROLE_ERROR);
         iControlRoleService.editControlRole(userId, nodeId, unitIds, role);
@@ -656,5 +658,21 @@ public class NodeRoleServiceImpl implements INodeRoleService {
             }
             addNodeRole(userId, nodeId, role, CollUtil.newArrayList(unitIds));
         });
+    }
+
+    @Override
+    public NodeCollaboratorsVo getListRole(String spaceId, String nodeId) {
+        NodeCollaboratorsVo listRole = new NodeCollaboratorsVo();
+        UnitMemberVo owner = getNodeOwner(nodeId);
+        listRole.setOwner(owner);
+        listRole.setRoleUnits(getNodeRoleUnitList(nodeId));
+        listRole.setBelongRootFolder(iNodeService.isNodeBelongRootFolder(spaceId, nodeId));
+        listRole.setSelf(owner);
+
+        Long ownerId = getNodeOwnerId(nodeId);
+        List<UnitMemberVo> unitMemberVos = iOrganizationService.findUnitMemberVo(Collections.singletonList(ownerId));
+        listRole.setAdmins(unitMemberVos);
+
+        return listRole;
     }
 }

@@ -38,5 +38,6 @@ public class ParamsConstants {
     public static final String INTERNAL_REQUEST = "X-Internal-Request";
     public static final String SPACE_ID_PARAMETER = "spaceId";
     public static final String USER_ID_PARAMETER = "userId";
+    public static final String NODE_ID_PARAMETER = "nodeId";
 
 }

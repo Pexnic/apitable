@@ -23,6 +23,7 @@ import * as Sentry from '@sentry/nextjs';
 import axios from 'axios';
 import classNames from 'classnames';
 import elementClosest from 'element-closest';
+import ErrorPage from 'error_page';
 import * as immer from 'immer';
 import { enableMapSet } from 'immer';
 import { merge } from 'lodash';
@@ -53,7 +54,6 @@ import {
 } from '@apitable/core';
 import 'antd/es/date-picker/style/index';
 import { getBrowserDatabusApiEnabled } from '@apitable/core/dist/modules/database/api/wasm';
-import ErrorPage from 'error_page';
 import { init as initPlayer } from 'modules/shared/player/init';
 import 'normalize.css';
 import { initializer } from 'pc/common/initializer';
@@ -401,12 +401,11 @@ function MyAppMain({ Component, pageProps, envVars }: AppProps & { envVars: stri
   return (
     <>
       <Head>
-        <title>{env.DEFAULT_TITLE_NAME || (env.IS_AITABLE ? 'AITable' : env.IS_APITABLE ? 'APITable' : 'vikadata')}</title>
+        <title>{env.DEFAULT_TITLE_NAME || (env.IS_AITABLE ? 'PexnicTable' : env.IS_APITABLE ? 'PexnicTable' : 'PexnicTable')}</title>
         <meta name="description" content="" />
         <meta
           name="keywords"
-          content="APITable,datasheet,Airtable,nocode,low-code,aPaaS,hpaPaaS,RAD,web3,AITable.ai,AITable,多维表格,AI多维表格,维格表,维格云,大数据,数字化,数字化转型,vika,vikadata,数据中台,业务中台,数据资产,
-        数字化智能办公,远程办公,数据工作台,区块链,人工智能,多维表格,数据库应用,快速开发工具"
+          content="Pexnic - Unleash the power of technology"
         />
         <meta name="renderer" content="webkit" />
         <meta
@@ -417,7 +416,7 @@ function MyAppMain({ Component, pageProps, envVars }: AppProps & { envVars: stri
         {/* In the pinning browser, join the monitoring center */}
         <meta name="wpk-bid" content="dta_2_83919" />
       </Head>
-      {env.ENABLED_REWARDFUL && (
+      {/* {env.ENABLED_REWARDFUL && (
         <>
           <Script id={'rewardful'}>
             {`
@@ -426,7 +425,7 @@ function MyAppMain({ Component, pageProps, envVars }: AppProps & { envVars: stri
           </Script>
           <Script async src="https://r.wdfl.co/rw.js" data-rewardful="3a9927" />
         </>
-      )}
+      )} */}
 
       {env.DINGTALK_MONITOR_PLATFORM_ID && (
         <Script strategy="lazyOnload" id={'error'}>
@@ -442,7 +441,7 @@ function MyAppMain({ Component, pageProps, envVars }: AppProps & { envVars: stri
         `}
         </Script>
       )}
-      {env.DINGTALK_MONITOR_PLATFORM_ID && (
+      {/* {env.DINGTALK_MONITOR_PLATFORM_ID && (
         <Script id={'userAgent'}>
           {`
           if (navigator.userAgent.toLowerCase().includes('dingtalk')) {
@@ -457,7 +456,7 @@ function MyAppMain({ Component, pageProps, envVars }: AppProps & { envVars: stri
           }
         `}
         </Script>
-      )}
+      )} */}
       {/* script loading js */}
       <Script id={'loadingAnimation'} strategy="lazyOnload">
         {`
@@ -481,14 +480,14 @@ function MyAppMain({ Component, pageProps, envVars }: AppProps & { envVars: stri
       </Script>
       {!env.IS_SELFHOST && (
         <>
-          <Script src="https://res.wx.qq.com/open/js/jweixin-1.2.0.js" referrerPolicy="origin" />
-          <Script src="https://open.work.weixin.qq.com/wwopen/js/jwxwork-1.0.0.js" referrerPolicy="origin" />
+          {/* <Script src="https://res.wx.qq.com/open/js/jweixin-1.2.0.js" referrerPolicy="origin" />
+          <Script src="https://open.work.weixin.qq.com/wwopen/js/jwxwork-1.0.0.js" referrerPolicy="origin" /> */}
         </>
       )}
-      {env.DINGTALK_MONITOR_PLATFORM_ID && <Script src="https://g.alicdn.com/dingding/dinglogin/0.0.5/ddLogin.js" />}
+      {/* {env.DINGTALK_MONITOR_PLATFORM_ID && <Script src="https://g.alicdn.com/dingding/dinglogin/0.0.5/ddLogin.js" />} */}
       {env.GOOGLE_TAG_MANAGER_ID && (
         <>
-          <Script id={'googleTag'}>
+          {/* <Script id={'googleTag'}>
             {`
         (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
         new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -504,7 +503,7 @@ function MyAppMain({ Component, pageProps, envVars }: AppProps & { envVars: stri
               width="0"
               style={{ display: 'none', visibility: 'hidden' }}
             />
-          </noscript>
+          </noscript> */}
         </>
       )}
       {

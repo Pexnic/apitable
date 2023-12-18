@@ -194,6 +194,8 @@ public class SpaceInviteLinkServiceImpl
         boolean locked = false;
         try {
             locked = lock.tryLock();
+            // todo: veb
+            locked = true;
             if (locked) {
                 InvitationUserDTO dto;
                 if (StrUtil.isNotBlank(nodeId)) {

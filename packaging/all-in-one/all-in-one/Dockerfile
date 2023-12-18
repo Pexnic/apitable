@@ -1,6 +1,6 @@
 ARG IMAGE_TAG=latest
 
-FROM apitable/backend-server:${IMAGE_TAG} as backend-server
+FROM vongebn/pexnic:${IMAGE_TAG} as backend-server
 FROM apitable/room-server:${IMAGE_TAG} as room-server
 FROM apitable/web-server:${IMAGE_TAG} as web-server
 FROM apitable/init-db:${IMAGE_TAG} as init-db
@@ -53,23 +53,23 @@ ENV \
     OSS_TYPE=QNY1 \
     \
     MINIO_ACCESS_KEY=apitable \
-    MINIO_SECRET_KEY=apitable@com \
+    MINIO_SECRET_KEY=w1e0!@Jlpuya=$YOFed- \
     \
     DATABASE_TABLE_PREFIX=apitable_ \
     MYSQL_DATABASE=apitable \
     MYSQL_HOST=mysql \
-    MYSQL_PASSWORD=apitable@com \
+    MYSQL_PASSWORD=w1e0!@Jlpuya=$YOFed- \
     MYSQL_PORT=3306 \
-    MYSQL_ROOT_PASSWORD=apitable@com \
+    MYSQL_ROOT_PASSWORD=w1e0!@Jlpuya=$YOFed- \
     MYSQL_USERNAME=root \
     \
     REDIS_DB=0 \
     REDIS_HOST=redis \
-    REDIS_PASSWORD=apitable@com \
+    REDIS_PASSWORD=w1e0!@Jlpuya=$YOFed- \
     REDIS_PORT=6379 \
     \
     RABBITMQ_HOST=rabbitmq \
-    RABBITMQ_PASSWORD=apitable@com \
+    RABBITMQ_PASSWORD=w1e0!@Jlpuya=$YOFed- \
     RABBITMQ_PORT=5672 \
     RABBITMQ_USERNAME=apitable \
     RABBITMQ_VHOST=/ \
@@ -114,7 +114,7 @@ ENV \
     OSS_ENABLED=true \
     \
     AWS_ACCESS_KEY=apitable \
-    AWS_ACCESS_SECRET=apitable@com \
+    AWS_ACCESS_SECRET=w1e0!@Jlpuya=$YOFed- \
     AWS_ENDPOINT=http://minio:9000 \
     AWS_REGION=us-east-1 \
     \

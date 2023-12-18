@@ -180,4 +180,44 @@ public class InternalFieldPermissionController {
         }
         return ResponseData.success(views);
     }
+
+    /**
+     * get field permission set for multiple nodes.
+     */
+    @GetResource(path = "/datasheet/field/permission", requiredLogin = false)
+    @Operation(summary = "get field permission set for multiple nodes")
+    public ResponseData<List<FieldPermissionView>> getDatasheetMultiFieldPermissionViews(
+        @RequestBody @Valid InternalPermissionRo data) {
+        // Filter non-existing nodes to prevent subsequent exceptions from being thrown
+        List<String> existNodeIds = iNodeService.getExistNodeIdsBySelf(data.getNodeIds());
+        if (existNodeIds.isEmpty()) {
+            return ResponseData.success(new ArrayList<>());
+        }
+        String shareId = data.getShareId();
+        // get space id
+        String spaceId = iNodeService.getSpaceIdByNodeIds(existNodeIds);
+        String userId = data.getUserId();
+        // When loading node permissions in sharing, the permissions of the last changer in the
+        // sharing settings shall prevail. The method includes judging whether the changer exists.
+        if (StrUtil.isBlank(userId)) {
+            // When loading node permissions in sharing, the permissions of the last changer in
+            // the sharing settings shall prevail. The method includes judging whether the
+            // changer exists.
+            userId = StrUtil.isNotBlank(shareId) ? StrUtil.toString(
+                iNodeShareSettingService.getUpdatedByByShareId(shareId)) :
+                SessionContext.getUserId().toString();
+        }
+        Long memberId =
+            iMemberService.getMemberIdByUserIdAndSpaceId(Long.parseLong(userId), spaceId);
+        // get field permissions for all nodes
+        List<FieldPermissionView> views = new ArrayList<>();
+        for (String nodeId : existNodeIds) {
+            FieldPermissionView view =
+                iFieldRoleService.getFieldPermissionView(memberId, nodeId, shareId);
+            if (view != null) {
+                views.add(view);
+            }
+        }
+        return ResponseData.success(views);
+    }
 }

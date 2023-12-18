@@ -32,10 +32,14 @@ import com.apitable.shared.component.scanner.annotation.GetResource;
 import com.apitable.shared.constants.ParamsConstants;
 import com.apitable.shared.context.LoginContext;
 import com.apitable.shared.holder.SpaceHolder;
+import com.apitable.shared.util.page.PageInfo;
 import com.apitable.space.service.ISpaceService;
 import com.apitable.space.vo.SpaceGlobalFeature;
 import com.apitable.user.service.IUserService;
+import com.apitable.workspace.service.INodeRoleService;
 import com.apitable.workspace.vo.NodeCollaboratorVO;
+import com.apitable.workspace.vo.NodeRoleMemberVo;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -65,6 +69,9 @@ public class NodeCollaboratorController {
 
     @Resource
     private ControlTemplate controlTemplate;
+
+    @Resource
+    private INodeRoleService iNodeRoleService;
 
     /**
      * get collaborator info.
@@ -106,5 +113,26 @@ public class NodeCollaboratorController {
             collaboratorVO.setRole(role.getRoleTag());
         }
         return ResponseData.success(collaboratorVO);
+    }
+
+    /**
+     * get collaborator info.
+     *
+     * @param nodeId node id
+     * @return collaborator info
+     */
+    @GetResource(path = "/collaborator/page")
+    @Operation(summary = "Get Collaborator Info",
+        description = "Scene: Collaborator Card Information")
+    @Parameters({
+        @Parameter(name = "nodeId", in = ParameterIn.QUERY, required = true,
+            schema = @Schema(type = "string"), example = "nodRTGSy43DJ9"),
+    })
+    public ResponseData<PageInfo<NodeRoleMemberVo>> getCollaborators(
+        @RequestParam(name = "nodeId") String nodeId
+    ) {
+        Page<NodeRoleMemberVo> page = new Page<NodeRoleMemberVo>();
+
+        return ResponseData.success(iNodeRoleService.getNodeRoleMembersPageInfo(page, nodeId));
     }
 }

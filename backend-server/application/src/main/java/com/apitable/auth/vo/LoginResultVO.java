@@ -19,6 +19,7 @@
 package com.apitable.auth.vo;
 
 import com.apitable.shared.support.serializer.NullBooleanSerializer;
+import com.apitable.shared.support.serializer.NullStringSerializer;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -43,4 +44,8 @@ public class LoginResultVO {
     @Schema(description = "User registration sign", example = "true")
     @JsonSerialize(nullsUsing = NullBooleanSerializer.class)
     private Boolean isNewUser;
+
+    @Schema(description = "Api token", example = "B1m4EuIcn&6#k{W6")
+    @JsonSerialize(nullsUsing = NullStringSerializer.class)
+    private String apiToken;
 }

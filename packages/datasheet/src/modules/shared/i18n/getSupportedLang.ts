@@ -61,10 +61,10 @@ export const fallbackLang = <T extends string>(code: string, { supportedLngs, fa
 export const getSupportedLang = (lang: string) => {
   type ISupportedLngs = string;
   const languageManifest = _global.languageManifest;
-  const langKeys = { zh: 'zh-CN' };
+  const langKeys = { zh: 'zh-CN', vi: 'vi-VN' };
   Object.keys(languageManifest).forEach((item) => {
     const keys = item.split('-');
-    if (keys.length === 2 && !langKeys[keys[0]]) {
+    if (keys.length === 2 && langKeys[keys[0]]) {
       langKeys[keys[0]] = item;
       langKeys[keys[1]] = item;
     }

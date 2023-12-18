@@ -25,15 +25,12 @@ import { SelectUnitModal, SelectUnitSource } from 'pc/components/catalog/permiss
 import { UnitTag } from 'pc/components/catalog/permission_settings/permission/select_unit_modal/unit_tag';
 import { Modal } from 'pc/components/common/modal/modal/modal';
 import { useEditSubAdmin, useNotificationCreate } from 'pc/hooks';
+import { useAppSelector } from 'pc/store/react-redux';
 import { generateUserInfo } from 'pc/utils';
 import { PermissionCard } from '../permission_card';
+// import { SubscribeUsageTipType, triggerUsageAlert } from 'enterprise/billing/trigger_usage_alert';
+// import { getSocialWecomUnitName } from 'enterprise/home/social_platform/utils';
 import styles from './style.module.less';
-// @ts-ignore
-import { getSocialWecomUnitName } from 'enterprise/home/social_platform/utils';
-// @ts-ignore
-import { SubscribeUsageTipType, triggerUsageAlert } from 'enterprise/billing/trigger_usage_alert'
-
-import {useAppSelector} from "pc/store/react-redux";
 
 const modalTitle = {
   read: t(Strings.sub_admin_view),
@@ -90,12 +87,13 @@ export const AddAdminModal: FC<React.PropsWithChildren<IModalProps>> = ({ cancel
   const modalConfirm = () => {
     if (source === ModalType.Add) {
       const memberIds = selectedMembers.map((item) => (item as IMember).memberId);
-      const result = triggerUsageAlert(
-        'maxAdminNums',
-        { usage: memberIds.length + existSubAdminNum, alwaysAlert: true },
-        SubscribeUsageTipType.Alert,
-      );
-      if (result) return;
+      // Todo: VEB
+      // const result = triggerUsageAlert(
+      //   'maxAdminNums',
+      //   { usage: memberIds.length + existSubAdminNum, alwaysAlert: true },
+      //   SubscribeUsageTipType.Alert,
+      // );
+      // if (result) return;
       setSubmitBtnLoading(true);
       addSubAdminAndNotice(memberIds, resourceCodes, handCancel);
       return;
@@ -142,11 +140,13 @@ export const AddAdminModal: FC<React.PropsWithChildren<IModalProps>> = ({ cancel
   };
   const title =
     source !== ModalType.Add && editOrReadSubMainInfo
-      ? getSocialWecomUnitName?.({
-        name: editOrReadSubMainInfo?.memberName,
-        isModified: editOrReadSubMainInfo?.isMemberNameModified,
-        spaceInfo,
-      }) || editOrReadSubMainInfo?.memberName
+      ? 
+      // getSocialWecomUnitName?.({
+      //   name: editOrReadSubMainInfo?.memberName,
+      //   isModified: editOrReadSubMainInfo?.isMemberNameModified,
+      //   spaceInfo,
+      // }) || 
+      editOrReadSubMainInfo?.memberName
       : '';
   return (
     <>
@@ -184,12 +184,13 @@ export const AddAdminModal: FC<React.PropsWithChildren<IModalProps>> = ({ cancel
               {selectedMembers.length > 0 &&
                 selectedMembers.map((item) => {
                   const userInfo = generateUserInfo(item);
-                  const title =
-                    getSocialWecomUnitName({
-                      name: (item as IMember)?.originName,
-                      isModified: (item as IMember)?.isMemberNameModified,
-                      spaceInfo,
-                    }) || (item as IMember)?.originName;
+                  // Todo: VEB
+                  // const title =
+                  //   getSocialWecomUnitName({
+                  //     name: (item as IMember)?.originName,
+                  //     isModified: (item as IMember)?.isMemberNameModified,
+                  //     spaceInfo,
+                  //   }) || (item as IMember)?.originName;
                   return (
                     <UnitTag
                       key={item.unitId}
